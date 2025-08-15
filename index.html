@@ -30,14 +30,14 @@
 
         function addPunctuationDuringSpeech(text) {
             text = text.trim();
-            text = text.charAt(0).toUpperCase() + text.slice(1);
-
+            if (text.length > 0) {
+                text = text.charAt(0).toUpperCase() + text.slice(1);
+            }
             if (!/[.!?]$/.test(text)) {
                 text += '.';
             }
             text = text.replace(/\s+(но|а|однако)\s+/gi, ', $1 ');
             text = text.replace(/\s+(что|чтобы)\s+/gi, ', $1 ');
-
             return text;
         }
 
@@ -48,7 +48,7 @@
             text = text.replace(/(^|[.!?]\s+)([а-яё])/g, (_, sep, letter) => sep + letter.toUpperCase());
 
             const questionWords = ['кто', 'что', 'где', 'когда', 'зачем', 'почему', 'как'];
-            let firstWord = text.split(/\s+/)[0].toLowerCase();
+            let firstWord = text.split(/\s+/)[0]?.toLowerCase();
             if (questionWords.includes(firstWord)) {
                 text = text.replace(/[.!?]?$/, '?');
             } else {
@@ -84,15 +84,6 @@
             output.textContent = 'Ошибка: ' + event.error;
         };
 
-        recognition.onend = function() {
-            if (recording) {
-                recognition.start(); // автопродолжение
-            } else {
-                fullText = smartFinalizePunctuation(fullText);
-                output.textContent = fullText;
-            }
-        };
-
         startBtn.onclick = async () => {
             if (!recording) {
                 // Первый раз — запросить доступ к микрофону
@@ -102,9 +93,13 @@
                 startBtn.textContent = '■ Остановить запись';
                 recognition.start();
             } else {
+                // Останавливаем запись
                 recording = false;
                 startBtn.textContent = '🎤 Начать запись';
                 recognition.stop();
+                // Сразу показываем финальный текст
+                fullText = smartFinalizePunctuation(fullText);
+                output.textContent = fullText;
             }
         };
     </script>
