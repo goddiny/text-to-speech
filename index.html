@@ -1,109 +1,70 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Распознавание речи</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: #f0f0f0;
-        }
-        #startBtn {
-            padding: 15px 30px;
-            font-size: 20px;
-            border: none;
-            border-radius: 10px;
-            background-color: #007BFF; /* синий */
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        #startBtn.recording {
-            background-color: #28a745; /* зелёный при записи */
-        }
-        #output {
-            width: 90%;
-            max-width: 500px;
-            height: 200px;
-            margin-top: 20px;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            resize: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тест SpeechRecognition</title>
+<style>
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial; margin:0; }
+    button { padding: 15px 30px; font-size: 20px; margin-bottom: 20px; }
+    textarea { width: 90%; max-width: 500px; height: 200px; font-size: 16px; }
+</style>
 </head>
 <body>
-    <button id="startBtn">🎤 Начать запись</button>
-    <textarea id="output" readonly placeholder="Здесь появится текст..."></textarea>
+<button id="startBtn">🎤 Начать запись</button>
+<textarea id="output" readonly placeholder="Результаты распознавания появятся здесь"></textarea>
 
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const output = document.getElementById('output');
+<script>
+const startBtn = document.getElementById('startBtn');
+const output = document.getElementById('output');
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            output.value = "❌ Ваш браузер не поддерживает Web Speech API.";
-        }
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+    output.value = "Ваш браузер не поддерживает Web Speech API.";
+} else {
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ru-RU';
+    recognition.interimResults = true;
+    recognition.continuous = true;
 
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ru-RU';
-        recognition.interimResults = false;
-        recognition.continuous = true;
+    let recording = false;
 
-        let recording = false;
-        let fullText = '';
-
-        function smartFinalizePunctuation(text) {
-            text = text.trim();
-            text = text.replace(/\s+/g, ' ');
-            if (!/[.!?]$/.test(text)) text += '.';
-            return text;
-        }
-
-        recognition.onresult = function(event) {
-            let result = event.results[event.results.length - 1];
-            if (result.isFinal) {
-                fullText += (fullText ? ' ' : '') + result[0].transcript.trim();
-                output.value = fullText;
-            }
-        };
-
-        recognition.onerror = function(event) {
-            output.value = 'Ошибка: ' + event.error;
-        };
-
-        startBtn.onclick = async () => {
-            if (!recording) {
-                try {
-                    await navigator.mediaDevices.getUserMedia({ audio: true });
-                    fullText = '';
-                    recording = true;
-                    startBtn.textContent = '■ Остановить запись';
-                    startBtn.classList.add('recording');
-                    output.value = '🎙 Запись... говорите';
-                    recognition.start();
-                } catch (err) {
-                    output.value = "❌ Нет доступа к микрофону";
-                }
+    recognition.onresult = (event) => {
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalText += event.results[i][0].transcript + ' ';
             } else {
-                recording = false;
-                startBtn.textContent = '🎤 Начать запись';
-                startBtn.classList.remove('recording');
-                recognition.stop();
-                fullText = smartFinalizePunctuation(fullText);
-                output.value = fullText || 'Нет распознанного текста';
+                interim += event.results[i][0].transcript;
             }
-        };
-    </script>
+        }
+        output.value = finalText + '|' + interim; // final | промежуточный
+        console.log('Final:', finalText, 'Interim:', interim);
+    };
+
+    recognition.onerror = (event) => {
+        output.value = 'Ошибка: ' + event.error;
+        console.log('Ошибка:', event);
+    };
+
+    startBtn.onclick = async () => {
+        if (!recording) {
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+                recognition.start();
+                recording = true;
+                startBtn.textContent = '■ Остановить запись';
+            } catch (err) {
+                output.value = 'Нет доступа к микрофону';
+            }
+        } else {
+            recognition.stop();
+            recording = false;
+            startBtn.textContent = '🎤 Начать запись';
+        }
+    };
+}
+</script>
 </body>
 </html>
