@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice to Text с автопунктуацией и умной проверкой</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        button { padding: 10px 20px; font-size: 18px; }
+        #output { margin-top: 20px; font-size: 20px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <button id="startBtn">🎤 Начать запись</button>
+    <p id="output"></p>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const output = document.getElementById('output');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        recognition.lang = 'ru-RU';
+        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        let lastResultTime = Date.now();
+        let fullText = '';
+
+        function addPunctuationDuringSpeech(text) {
+            text = text.trim();
+            text = text.charAt(0).toUpperCase() + text.slice(1);
+
+            if (!/[.!?]$/.test(text)) {
+                text += '.';
+            }
+
+            text = text.replace(/\s+(но|а|однако)\s+/gi, ', $1 ');
+            text = text.replace(/\s+(что|чтобы)\s+/gi, ', $1 ');
+
+            return text;
+        }
+
+        function smartFinalizePunctuation(text) {
+            text = text.trim();
+
+            // Убираем двойные пробелы
+            text = text.replace(/\s+/g, ' ');
+
+            // Убираем лишние запятые перед точками/вопросительными/восклицательными
+            text = text.replace(/,\s*([.!?])/g, '$1');
+
+            // Первая буква в каждом предложении — заглавная
+            text = text.replace(/(^|[.!?]\s+)([а-яё])/g, (_, sep, letter) => sep + letter.toUpperCase());
+
+            // Если предложение начинается с вопросительного слова — ставим вопросительный
+            const questionWords = ['кто', 'что', 'где', 'когда', 'зачем', 'почему', 'как'];
+            let firstWord = text.split(/\s+/)[0].toLowerCase();
+            if (questionWords.includes(firstWord)) {
+                text = text.replace(/[.!?]?$/, '?');
+            } else {
+                text = text.replace(/[.!?]?$/, '.');
+            }
+
+            return text;
+        }
+
+        recognition.onresult = function(event) {
+            let currentTime = Date.now();
+            let textChunk = event.results[event.results.length - 1][0].transcript.trim();
+
+            if (currentTime - lastResultTime > 1200 && fullText) {
+                if (!/[.!?]$/.test(fullText)) {
+                    fullText += '. ';
+                }
+            } else if (currentTime - lastResultTime > 500 && fullText) {
+                if (!/[,.:;!?]$/.test(fullText)) {
+                    fullText += ', ';
+                }
+            }
+
+            fullText += textChunk;
+            output.textContent = addPunctuationDuringSpeech(fullText);
+            lastResultTime = currentTime;
+        };
+
+        recognition.onerror = function(event) {
+            output.textContent = 'Ошибка: ' + event.error;
+        };
+
+        recognition.onend = function() {
+            fullText = smartFinalizePunctuation(fullText);
+            output.textContent = fullText;
+        };
+
+        startBtn.onclick = () => {
+            fullText = '';
+            recognition.start();
+        };
+    </script>
+</body>
+</html>
