@@ -321,7 +321,14 @@
 
                         if (response.ok) {
                             const result = await response.json();
-                            return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                            const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (generatedText) {
+                                statusMessage.textContent = 'Готово';
+                                return generatedText;
+                            } else {
+                                statusMessage.textContent = 'Ошибка: Gemini не вернул текст. Использую базовую пунктуацию.';
+                                return getBasicPunctuatedText(text);
+                            }
                         } else {
                             console.error('Ошибка API:', response.status, await response.text());
                             throw new Error('API error');
@@ -333,7 +340,8 @@
                             delay *= 2;
                         } else {
                             console.error('Не удалось получить ответ от Gemini API после нескольких попыток.', error);
-                            return text;
+                            statusMessage.textContent = 'Ошибка: Не удалось подключиться к Gemini. Использую базовую пунктуацию.';
+                            return getBasicPunctuatedText(text);
                         }
                     }
                 }
@@ -343,21 +351,31 @@
             function getBasicPunctuatedText(text) {
                 statusMessage.textContent = 'Обработка текста...';
                 
-                let formattedText = text.trim().replace(/\s{2,}/g, ' ');
+                let formattedText = text.trim();
+                
+                // Замена нескольких пробелов на один
+                formattedText = formattedText.replace(/\s{2,}/g, ' ');
+
+                // Заглавная буква в начале предложения
                 if (formattedText.length > 0) {
                     formattedText = formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
                 }
+
+                // Заглавные буквы после точек, вопросительных и восклицательных знаков
                 formattedText = formattedText.replace(/([.?!])\s*([a-zа-яё])/g, (match, p1, p2) => {
                     return p1 + ' ' + p2.toUpperCase();
                 });
+
+                // Добавление точки в конце, если ее нет
                 const lastChar = formattedText.charAt(formattedText.length - 1);
                 if (lastChar !== '.' && lastChar !== '?' && lastChar !== '!') {
                     formattedText += '.';
                 }
-                formattedText = formattedText.replace(/ а /g, ', а ')
-                                           .replace(/ но /g, ', но ')
-                                           .replace(/ и /g, ', и ');
                 
+                // Добавление запятых перед некоторыми союзами
+                formattedText = formattedText.replace(/([^\s,])\s(а|но|и)\s/g, '$1, $2 ');
+                
+                statusMessage.textContent = 'Готово';
                 return formattedText;
             }
 
@@ -405,8 +423,6 @@
                     }
                     
                     resultTextarea.value = punctuatedText;
-                    statusMessage.textContent = 'Готово';
-
                 } else {
                     rawTranscript = resultTextarea.value;
                     recognition.start();
